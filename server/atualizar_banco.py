@@ -66,6 +66,12 @@ except Exception as e:
 
 for m in medicamentos:
     med_id = m.get('id')
+    sql_select_med = "SELECT id FROM public.medicamento WHERE id_farmacia_digital = %s;"
+    cursor.execute(sql_select_med,(med_id,))
+    retorno = cursor.fetchone()
+    if retorno is not None:
+        continue
+
     if not med_id:
         print(f"Pulando medicamento pois não possui ID: {m}")
         continue
@@ -113,15 +119,20 @@ for m in medicamentos:
                 ON CONFLICT (id_farmacia_digital) DO NOTHING
                 RETURNING id;
             """
-        
-        cursor.execute(sql_cid, (cid_view.get("id"),cid_view.get("codigo"),cid_view.get("descricao")))
+        cid_id_farmacia_digital=0
+        try:
+            cursor.execute(sql_cid, (cid_view.get("id"),cid_view.get("codigo"),cid_view.get("descricao")))
+            cid_id_farmacia_digital=cid_view.get('id')
+        except:
+            cursor.execute(sql_cid, (-1, None, None))
+            cid_id_farmacia_digital=-1
 
         retorno = cursor.fetchone()
         if retorno:
             id_cid = retorno[0]
         else:
             sql_select_cid = "SELECT id FROM public.cid WHERE id_farmacia_digital = %s;"
-            cursor.execute(sql_select_cid, (cid_view.get('id'),))
+            cursor.execute(sql_select_cid, (cid_id_farmacia_digital,))
             id_cid = cursor.fetchone()[0]
 
         protocoloClinico_view = cid.get("protocoloClinicoViewED")
@@ -132,7 +143,13 @@ for m in medicamentos:
                     ON CONFLICT (id_farmacia_digital) DO NOTHING
                     RETURNING id;
                 """
-        cursor.execute(sql_protocolo,(protocoloClinico_view.get("id"),))
+        id_protocolo_farmacia = None
+        try:
+            id_protocolo_farmacia = protocoloClinico_view.get("id")
+        except:
+            id_protocolo_farmacia = med.get("idProtocoloClinico")
+
+        cursor.execute(sql_protocolo,(id_protocolo_farmacia,))
 
         retorno = cursor.fetchone()
         if retorno:
@@ -149,7 +166,10 @@ for m in medicamentos:
                 """
         cursor.execute(sql_medicamento_cid_protocolo,(id_med,id_cid,id_protocolo))
 
-        documentos_list = protocoloClinico_view.get("protocoloClinicoDocumentoList")
+        try:
+            documentos_list = protocoloClinico_view.get("protocoloClinicoDocumentoList")
+        except:
+            continue
         for doc in documentos_list:
             sql_documento = """
                         INSERT INTO public.documento (nome ,nrointdoc , nrointsubtipodoc) 
